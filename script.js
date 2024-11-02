@@ -1,11 +1,14 @@
+document.addEventListener('DOMContentLoaded', function() {
+    const cameraBtn = document.querySelector('.camera-btn');
+    cameraBtn.onclick = startCamera;
+});
+
+let qrcode = null;
+let countdownInterval = null;
+let stream = null;
+
 async function startCamera() {
     try {
-        // Limpiar stream anterior si existe
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-        }
-
-        // Crear o obtener elemento de video
         let camera = document.getElementById('camera');
         if (!camera) {
             camera = document.createElement('video');
@@ -22,29 +25,11 @@ async function startCamera() {
         capturedImage.style.display = 'none';
         camera.style.display = 'block';
 
-        // Intentar primero con configuración más flexible
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: 'environment'  // Removido 'exact'
-                }
-            });
-        } catch (initialError) {
-            // Si falla, intentar sin especificar facingMode
-            console.log('Intentando fallback...', initialError);
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: true
-            });
-        }
-
-        camera.srcObject = stream;
-
-        // Esperar a que el video esté listo
-        await new Promise((resolve) => {
-            camera.onloadedmetadata = () => {
-                camera.play().then(resolve);
-            };
+        stream = await navigator.mediaDevices.getUserMedia({ 
+            video: true
         });
+        
+        camera.srcObject = stream;
 
         const cameraBtn = document.querySelector('.camera-btn');
         cameraBtn.textContent = 'Capturar';
@@ -52,22 +37,32 @@ async function startCamera() {
 
     } catch (err) {
         console.error('Error al acceder a la cámara:', err);
-        
-        // Mensaje de error más amigable
-        let errorMessage = 'Error al acceder a la cámara. ';
-        if (err.name === 'NotAllowedError') {
-            errorMessage += 'Por favor permite el acceso a la cámara en los permisos del navegador.';
-        } else if (err.name === 'NotFoundError') {
-            errorMessage += 'No se encontró ninguna cámara disponible.';
-        } else {
-            errorMessage += 'Por favor verifica que la cámara esté disponible y refresca la página.';
-        }
-        
-        alert(errorMessage);
-        
-        // Restablecer botón
-        const cameraBtn = document.querySelector('.camera-btn');
-        cameraBtn.textContent = 'Generar QR';
-        cameraBtn.onclick = startCamera;
+        alert('Error al acceder a la cámara. Por favor intenta de nuevo.');
     }
+}
+
+async function captureImage() {
+    const camera = document.getElementById('camera');
+    const canvas = document.getElementById('canvas');
+    const capturedImage = document.getElementById('captured-image');
+
+    canvas.width = camera.videoWidth;
+    canvas.height = camera.videoHeight;
+    const ctx = canvas.getContext('2d');
+    
+    ctx.drawImage(camera, 0, 0);
+
+    capturedImage.src = canvas.toDataURL('image/jpeg', 1.0);
+    capturedImage.style.display = 'block';
+    camera.style.display = 'none';
+
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+
+    const cameraBtn = document.querySelector('.camera-btn');
+    cameraBtn.textContent = 'Generar QR';
+    cameraBtn.onclick = startCamera;
+
+    processImage(canvas);
 }
