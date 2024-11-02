@@ -1,14 +1,3 @@
-document.addEventListener('DOMContentLoaded', function() {
-    const cameraBtn = document.querySelector('.camera-btn');
-    const clearBtn = document.querySelector('.clear-btn');
-    cameraBtn.onclick = startCamera;
-    clearBtn.onclick = clearAll;
-});
-
-let qrcode = null;
-let countdownInterval = null;
-let stream = null;
-
 async function startCamera() {
     try {
         let camera = document.getElementById('camera');
@@ -27,59 +16,84 @@ async function startCamera() {
         capturedImage.style.display = 'none';
         camera.style.display = 'block';
 
-        // Intentar primero con la cámara trasera
+        // Primero, enumerar los dispositivos disponibles
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        
+        // Si hay más de una cámara, intentar usar la última (generalmente la trasera)
+        let constraints;
+        if (videoDevices.length > 1) {
+            constraints = {
+                video: {
+                    deviceId: { exact: videoDevices[videoDevices.length - 1].deviceId },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                }
+            };
+        } else {
+            // Si solo hay una cámara, usar configuración básica
+            constraints = {
+                video: {
+                    facingMode: { exact: 'environment' },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                }
+            };
+        }
+
         try {
+            // Intentar con las restricciones específicas primero
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (specificError) {
+            console.log('Error con configuración específica, intentando configuración genérica...', specificError);
+            
+            // Si falla, intentar con configuración más básica
             stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    facingMode: 'environment'
+                    facingMode: 'environment',
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
                 }
-            });
-        } catch (error) {
-            // Si falla, intentar con cualquier cámara
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: true
             });
         }
         
         camera.srcObject = stream;
+
+        // Esperar a que el video esté listo
+        await new Promise((resolve) => {
+            camera.onloadedmetadata = () => {
+                camera.play()
+                    .then(resolve)
+                    .catch(error => {
+                        console.error('Error al reproducir el video:', error);
+                        throw error;
+                    });
+            };
+        });
 
         const cameraBtn = document.querySelector('.camera-btn');
         cameraBtn.textContent = 'Capturar';
         cameraBtn.onclick = captureImage;
 
     } catch (err) {
-        console.error('Error al acceder a la cámara:', err);
-        alert('Error al acceder a la cámara. Por favor intenta de nuevo.');
+        console.error('Error detallado al acceder a la cámara:', err);
+        
+        // Mostrar un mensaje de error más específico
+        let errorMessage = 'Error al acceder a la cámara. ';
+        if (err.name === 'NotAllowedError') {
+            errorMessage += 'Por favor permite el acceso a la cámara en los permisos del navegador.';
+        } else if (err.name === 'NotFoundError') {
+            errorMessage += 'No se encontró la cámara trasera.';
+        } else if (err.name === 'NotReadableError') {
+            errorMessage += 'La cámara está siendo usada por otra aplicación.';
+        } else {
+            errorMessage += 'Por favor, cierra otras aplicaciones que puedan estar usando la cámara y refresca la página.';
+        }
+        
+        alert(errorMessage);
+        
+        const cameraBtn = document.querySelector('.camera-btn');
+        cameraBtn.textContent = 'Generar QR';
+        cameraBtn.onclick = startCamera;
     }
 }
-
-function clearAll() {
-    const capturedImage = document.getElementById('captured-image');
-    if (capturedImage) {
-        capturedImage.style.display = 'none';
-        capturedImage.src = '';
-    }
-
-    const camera = document.getElementById('camera');
-    if (camera) {
-        camera.style.display = 'none';
-    }
-
-    if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-    }
-
-    document.getElementById('qrcode').innerHTML = '';
-    document.getElementById('qr-text').textContent = '';
-    document.getElementById('countdown').textContent = '';
-
-    if (countdownInterval) {
-        clearInterval(countdownInterval);
-    }
-
-    const cameraBtn = document.querySelector('.camera-btn');
-    cameraBtn.textContent = 'Generar QR';
-    cameraBtn.onclick = startCamera;
-}
-
-// El resto del código permanece igual...
