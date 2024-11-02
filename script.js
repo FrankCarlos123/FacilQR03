@@ -1,5 +1,3 @@
-// ... resto del código anterior ...
-
 async function startCamera() {
     try {
         // Limpiar stream anterior si existe
@@ -24,16 +22,21 @@ async function startCamera() {
         capturedImage.style.display = 'none';
         camera.style.display = 'block';
 
-        // Configurar solo para cámara trasera
-        const constraints = {
-            video: {
-                facingMode: { exact: "environment" },
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            }
-        };
+        // Intentar primero con configuración más flexible
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment'  // Removido 'exact'
+                }
+            });
+        } catch (initialError) {
+            // Si falla, intentar sin especificar facingMode
+            console.log('Intentando fallback...', initialError);
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: true
+            });
+        }
 
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
         camera.srcObject = stream;
 
         // Esperar a que el video esté listo
@@ -49,7 +52,18 @@ async function startCamera() {
 
     } catch (err) {
         console.error('Error al acceder a la cámara:', err);
-        alert('Error al acceder a la cámara. Por favor verifica los permisos de la cámara y refresca la página.');
+        
+        // Mensaje de error más amigable
+        let errorMessage = 'Error al acceder a la cámara. ';
+        if (err.name === 'NotAllowedError') {
+            errorMessage += 'Por favor permite el acceso a la cámara en los permisos del navegador.';
+        } else if (err.name === 'NotFoundError') {
+            errorMessage += 'No se encontró ninguna cámara disponible.';
+        } else {
+            errorMessage += 'Por favor verifica que la cámara esté disponible y refresca la página.';
+        }
+        
+        alert(errorMessage);
         
         // Restablecer botón
         const cameraBtn = document.querySelector('.camera-btn');
@@ -57,5 +71,3 @@ async function startCamera() {
         cameraBtn.onclick = startCamera;
     }
 }
-
-// ... resto del código sigue igual ...
