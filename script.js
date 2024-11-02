@@ -1,6 +1,8 @@
 document.addEventListener('DOMContentLoaded', function() {
     const cameraBtn = document.querySelector('.camera-btn');
+    const clearBtn = document.querySelector('.clear-btn');
     cameraBtn.onclick = startCamera;
+    clearBtn.onclick = clearAll;
 });
 
 let qrcode = null;
@@ -25,9 +27,19 @@ async function startCamera() {
         capturedImage.style.display = 'none';
         camera.style.display = 'block';
 
-        stream = await navigator.mediaDevices.getUserMedia({ 
-            video: true
-        });
+        // Intentar primero con la cámara trasera
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment'
+                }
+            });
+        } catch (error) {
+            // Si falla, intentar con cualquier cámara
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: true
+            });
+        }
         
         camera.srcObject = stream;
 
@@ -41,28 +53,33 @@ async function startCamera() {
     }
 }
 
-async function captureImage() {
-    const camera = document.getElementById('camera');
-    const canvas = document.getElementById('canvas');
+function clearAll() {
     const capturedImage = document.getElementById('captured-image');
+    if (capturedImage) {
+        capturedImage.style.display = 'none';
+        capturedImage.src = '';
+    }
 
-    canvas.width = camera.videoWidth;
-    canvas.height = camera.videoHeight;
-    const ctx = canvas.getContext('2d');
-    
-    ctx.drawImage(camera, 0, 0);
-
-    capturedImage.src = canvas.toDataURL('image/jpeg', 1.0);
-    capturedImage.style.display = 'block';
-    camera.style.display = 'none';
+    const camera = document.getElementById('camera');
+    if (camera) {
+        camera.style.display = 'none';
+    }
 
     if (stream) {
         stream.getTracks().forEach(track => track.stop());
     }
 
+    document.getElementById('qrcode').innerHTML = '';
+    document.getElementById('qr-text').textContent = '';
+    document.getElementById('countdown').textContent = '';
+
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+    }
+
     const cameraBtn = document.querySelector('.camera-btn');
     cameraBtn.textContent = 'Generar QR';
     cameraBtn.onclick = startCamera;
-
-    processImage(canvas);
 }
+
+// El resto del código permanece igual...
